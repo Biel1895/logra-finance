@@ -10,6 +10,7 @@ const suites = [
   'reports-installments',
   'management',
   'balances',
+  'opening-balance',
   'cloud',
   'pwa',
 ];

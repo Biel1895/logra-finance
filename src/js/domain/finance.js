@@ -11,13 +11,19 @@ function entryAmount(entry) {
 }
 
 function normalizeEntry(item, raw) {
-  const entryKind = raw.entryKind === 'reversal' ? 'reversal' : 'normal',
+  const entryKind = ['reversal', 'opening'].includes(raw.entryKind) ? raw.entryKind : 'normal',
     relatedTransactionId = String(raw.relatedTransactionId || '').slice(0, 96);
+  if (entryKind === 'opening' && (item.type === 'investment' || relatedTransactionId)) {
+    throw new Error(
+      'O saldo inicial precisa ser um valor de conta sem vínculo com outro lançamento.',
+    );
+  }
   if (entryKind === 'reversal' && !relatedTransactionId) {
     throw new Error('O estorno precisa estar vinculado ao lançamento original.');
   }
   return {
     ...item,
+    ...(entryKind === 'opening' && { description: 'Saldo inicial', category: 'Saldo inicial' }),
     entryKind,
     relatedTransactionId: entryKind === 'reversal' ? relatedTransactionId : '',
     operationId: String(raw.operationId || '').slice(0, 96),
@@ -75,12 +81,19 @@ function validateFinancialGraph(payload, options = {}) {
   const txs = new Map(payload.transactions.map((t) => [t.id, t])),
     rules = new Map(payload.rules.map((r) => [r.id, r]));
   const refunds = new Map();
+  if (payload.transactions.filter((tx) => tx.entryKind === 'opening').length > 1) {
+    throw new Error('Cada conta pode ter apenas um saldo inicial.');
+  }
   for (const tx of payload.transactions) {
     if (tx.entryKind !== 'reversal') {
       continue;
     }
     const original = txs.get(tx.relatedTransactionId);
-    if (!original || original.entryKind === 'reversal' || original.id === tx.id) {
+    if (
+      !original ||
+      ['reversal', 'opening'].includes(original.entryKind) ||
+      original.id === tx.id
+    ) {
       throw new Error(`Estorno “${tx.description}” sem lançamento original válido.`);
     }
     if (tx.type !== original.type) {
@@ -137,7 +150,7 @@ function validateFinancialGraph(payload, options = {}) {
     }
     if (bill.status === 'paid') {
       const tx = findBillTransaction(bill, payload.transactions);
-      if (!tx || tx.entryKind === 'reversal') {
+      if (!tx || ['reversal', 'opening'].includes(tx.entryKind)) {
         throw new Error(
           `A conta “${bill.description}” está paga, mas seu lançamento não existe no backup nem na conta atual.`,
         );
@@ -180,7 +193,9 @@ function validateFinancialGraph(payload, options = {}) {
 function sums(items) {
   const totals = items.reduce(
     (sum, t) => {
-      sum[t.type] += cents(entryAmount(t));
+      if (t.entryKind !== 'opening') {
+        sum[t.type] += cents(entryAmount(t));
+      }
       return sum;
     },
     { income: 0, expense: 0, investment: 0 },

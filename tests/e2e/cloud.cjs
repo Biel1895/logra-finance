@@ -262,6 +262,14 @@ async function manual(p, desc, amount) {
   await p.locator('#manualSaveButton').click();
   await p.locator('#composerDialog').waitFor({ state: 'hidden' });
 }
+async function openingBalance(p, amount) {
+  await p.locator('[data-action="settings"]').filter({ visible: true }).first().click();
+  await p.locator('#btnEditOpeningBalance').click();
+  await p.locator('#openingBalanceAmount').fill(amount);
+  await p.locator('#btnSaveOpeningBalance').click();
+  await p.locator('#openingBalanceDialog').waitFor({ state: 'hidden' });
+  await p.locator('#settingsDialog [data-close]').click();
+}
 (async () => {
   browser = await launchBrowser({ headless: true });
   const url = siteUrl + 'login.html';
@@ -441,6 +449,33 @@ async function manual(p, desc, amount) {
   await p2.waitForFunction(() => FF_STATE.rules.length === 1 && FF_STATE.bills.length > 0);
   assert.equal(await p2.evaluate(() => FF_STATE.transactions.length), 1);
   pass('Contas e recorrências também sincronizam sem alterar saldo pendente');
+  await Promise.all([openingBalance(p1, '1000,00'), openingBalance(p2, '1000,00')]);
+  await p1.waitForFunction(() => FF_STATE.pendingCount === 0 && !FF_STATE.syncBusy);
+  await p2.waitForFunction(() => FF_STATE.pendingCount === 0 && !FF_STATE.syncBusy);
+  await sync(p1);
+  await sync(p2);
+  assert.equal(
+    [...remote.values()].filter((row) => row.payload?.entryKind === 'opening').length,
+    1,
+  );
+  assert.equal(await p1.evaluate(() => FF_Finance.balanceSummary().total), 980);
+  assert.equal(await p2.evaluate(() => FF_Finance.balanceSummary().total), 980);
+  pass('Dois aparelhos definem um único saldo inicial, sem duplicar o valor na nuvem');
+  await c1.setOffline(true);
+  await openingBalance(p1, '1250,50');
+  assert.equal(await p1.evaluate(() => FF_Finance.balanceSummary().total), 1230.5);
+  assert.ok((await p1.evaluate(() => FF_STATE.pendingCount)) > 0);
+  await c1.setOffline(false);
+  await p1.waitForFunction(() => FF_STATE.pendingCount === 0 && !FF_STATE.syncBusy);
+  await sync(p2);
+  assert.equal(await p2.evaluate(() => FF_Finance.balanceSummary().total), 1230.5);
+  assert.equal(
+    await p2.evaluate(
+      () => FF_STATE.transactions.filter((entry) => entry.entryKind === 'opening').length,
+    ),
+    1,
+  );
+  pass('Editar o saldo inicial offline sincroniza a correção no outro aparelho');
   assert.equal(errors.length, 0, errors.join('\n'));
   pass('Adaptador da nuvem não gerou erros JavaScript');
   fs.writeFileSync(

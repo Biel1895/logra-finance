@@ -25,12 +25,13 @@ Novas contas recebem identidade interna própria; o identificador de login norma
 
 ## Exportar e restaurar dados
 
-O backup JSON atual usa `application: 'FinancasFacil'` e `schemaVersion: 3`. Inclui `transactions`, `bills` e `rules`, sem senha. A importação aceita formatos antigos compatíveis e valida antes de gravar:
+O backup JSON usa `application: 'FinancasFacil'` e `schemaVersion: 4` quando contém saldo inicial, ou versão 3 quando contém apenas os registros anteriores. Inclui `transactions`, `bills` e `rules`, sem senha. O saldo inicial é um registro `tx` com `entryKind: 'opening'`, sincronizado pela fila existente. Seu identificador deriva da conta, evitando duplicação entre aparelhos e ao importar novamente. A importação aceita formatos antigos compatíveis e valida antes de gravar:
 
 - tipos, valores, datas e identificadores;
 - existência e unicidade dos pagamentos vinculados;
 - parcelas completas e sem repetições;
 - estornos com original e limites coerentes.
+- um único saldo inicial, separado dos pagamentos e dos estornos.
 
 Restaurar é uma mesclagem. Ao importar em outra conta, os identificadores e todas as referências são remapeados para preservar os registros da conta anterior. Antes da restauração é criada uma cópia local. Não altere esses vínculos com substituições parciais.
 

@@ -8,7 +8,11 @@ function isoMonth(y = state.selectedYear, m = state.selectedMonth) {
 function monthTransactions(offset = 0) {
   const date = new Date(state.selectedYear, state.selectedMonth + offset, 1);
   const prefix = isoMonth(date.getFullYear(), date.getMonth());
-  return state.transactions.filter((t) => t.date.startsWith(prefix));
+  return state.transactions.filter((t) => t.entryKind !== 'opening' && t.date.startsWith(prefix));
+}
+
+function openingBalance() {
+  return state.transactions.find((entry) => entry.entryKind === 'opening') || null;
 }
 
 function realBills() {
@@ -38,4 +42,11 @@ function mergedFinancialState(changes = [], deletions = []) {
   };
 }
 
-export { isoMonth, mergedFinancialState, monthTransactions, realBills, selectedPeriod };
+export {
+  isoMonth,
+  mergedFinancialState,
+  monthTransactions,
+  openingBalance,
+  realBills,
+  selectedPeriod,
+};

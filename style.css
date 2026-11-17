@@ -2905,5 +2905,33 @@ textarea {
     font-size: 0.61rem;
   }
 }
+.opening-balance-setup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px;
+  margin-bottom: 24px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius);
+  background: var(--primary-soft);
+}
+.opening-balance-setup h2 {
+  font-size: 1rem;
+  margin-bottom: 5px;
+}
+.opening-balance-setup p {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+#openingBalanceForm > .small {
+  margin-top: 8px;
+}
+#settingsOpeningBalance {
+  display: block;
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
 
 /* src/css/main.css */

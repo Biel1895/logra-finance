@@ -8,7 +8,7 @@ let snapshotBusy = false;
 function backupPayload() {
   return {
     application: 'FinancasFacil',
-    schemaVersion: 3,
+    schemaVersion: state.transactions.some((entry) => entry.entryKind === 'opening') ? 4 : 3,
     exportedAt: new Date().toISOString(),
     account: account(),
     transactions: state.transactions,

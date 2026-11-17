@@ -8,10 +8,12 @@ Totalizações de lançamentos, distribuição de parcelas e rateio de desconto 
 
 ## Saldo total e mensal
 
-- **Saldo total hoje:** entradas menos saídas de todo o histórico confirmado com data até hoje, inclusive. Fica estável ao navegar entre meses. Não inclui parcelas pendentes nem lançamentos com data futura.
+- **Saldo total hoje:** saldo inicial informado mais entradas menos saídas de todo o histórico confirmado com data até hoje, inclusive. Fica estável ao navegar entre meses. Não inclui parcelas pendentes nem lançamentos com data futura.
 - **Saldo do mês:** resultado apenas dos lançamentos do período selecionado. Pode incluir movimentações futuras que o usuário registrou nesse mês.
 - No modo `independent`, investimentos ficam separados do saldo. No modo `integrated`, os aportes também são descontados. A preferência vale para os dois saldos.
-- O sistema calcula o histórico informado pelo usuário. Não consulta saldo bancário nem presume um valor inicial ausente.
+- O usuário define o saldo inicial no convite exibido no primeiro acesso ou em **Dados e preferências → Saldo inicial**. Ele pode ser zero ou negativo e é somado ao total uma única vez. Ao corrigir o valor, a mesma base é atualizada.
+- O saldo inicial fica registrado com `entryKind: 'opening'`, com data de definição. Seu sinal usa `income` ou `expense`. Ele é excluído das receitas, despesas, resultados mensais e gráficos de movimentação. O extrato CSV o identifica como **Saldo inicial**.
+- Uma conta com histórico existente deve informar o saldo anterior aos lançamentos cadastrados. O formulário explica essa soma. O sistema calcula os valores informados pelo usuário.
 
 ## Vencimento e pagamento
 

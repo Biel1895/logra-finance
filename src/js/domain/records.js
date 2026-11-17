@@ -20,7 +20,12 @@ function validateAndSanitizeTransaction(rawItem, accountKey, period = currentPer
   const type = validTypes.includes(rawItem.type) ? rawItem.type : 'expense';
 
   const amountNum = Number(rawItem.amount);
-  if (!Number.isFinite(amountNum) || amountNum <= 0 || amountNum > 999999999.99) {
+  if (
+    !Number.isFinite(amountNum) ||
+    amountNum < 0 ||
+    (amountNum === 0 && rawItem.entryKind !== 'opening') ||
+    amountNum > 999999999.99
+  ) {
     return null;
   }
   const roundedAmount = Math.round(amountNum * 100) / 100;
@@ -66,7 +71,7 @@ function sanitizeTransaction(raw, key) {
     throw new Error('Confira a data e o tipo do lançamento.');
   }
   const item = validateAndSanitizeTransaction(raw, key);
-  if (!item || !amountOK(item.amount)) {
+  if (!item || (!amountOK(item.amount) && !(raw.entryKind === 'opening' && item.amount === 0))) {
     throw new Error('Informe um valor entre R$ 0,01 e R$ 999.999.999,99.');
   }
   return normalizeEntry(item, raw);

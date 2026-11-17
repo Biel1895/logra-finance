@@ -8,6 +8,7 @@ import {
 } from './auth.js';
 import { editorPaymentFields, openEditor, saveManual } from './editing.js';
 import { isPending } from './finance.js';
+import { openOpeningBalance, saveOpeningBalance } from './opening-balance.js';
 import {
   cancelBill,
   cancelPurchase,
@@ -91,6 +92,8 @@ async function runAction(button) {
     renderSettings();
     $('profileName').value = state.loggedAccount.displayName;
     $('settingsDialog').showModal();
+  } else if (action === 'opening-balance') {
+    openOpeningBalance();
   } else if (action === 'edit-tx') {
     openEditor(id);
   } else if (action === 'edit-bill') {
@@ -142,6 +145,7 @@ async function runAction(button) {
 function bindEvents() {
   bindAuthRecovery();
   bindProfileEvents();
+  $('openingBalanceForm').addEventListener('submit', saveOpeningBalance);
   $('tabLoginBtn').addEventListener('click', () => {
     switchAuthTab('login');
     $('authIdentifier').focus();

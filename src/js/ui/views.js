@@ -10,9 +10,9 @@ import {
 import { renderPurchase } from '../application/operations.js';
 import { ensurePlannedBills } from '../data/repository.js';
 import { cents, entryAmount, isCancelled, sums } from '../domain/finance.js';
-import { dateLabel, today } from '../domain/format.js';
+import { dateLabel, formatDateBR, today } from '../domain/format.js';
 import { Cloud } from '../services/cloud.js';
-import { isoMonth, monthTransactions, realBills } from '../state/selectors.js';
+import { isoMonth, monthTransactions, openingBalance, realBills } from '../state/selectors.js';
 import { state } from '../state/store.js';
 import { $, emptyState, esc, icon, money } from './dom.js';
 import { showError } from './feedback.js';
@@ -103,14 +103,20 @@ function renderHome() {
     sum = sums(month),
     balances = balanceSummary();
   const balance = balances.total;
+  const opening = openingBalance();
+  $('openingBalanceSetup').hidden = Boolean(opening) || (Cloud.configured && !state.lastSync);
   const cards = [
     [
       'balance',
       'Saldo total hoje',
       balance,
-      state.balanceMode === 'integrated'
-        ? 'Acumulado até hoje, descontando aportes'
-        : 'Acumulado até hoje, investimentos separados',
+      opening
+        ? state.balanceMode === 'integrated'
+          ? 'Saldo inicial + movimentações até hoje, descontando aportes'
+          : 'Saldo inicial + movimentações até hoje, investimentos separados'
+        : state.balanceMode === 'integrated'
+          ? 'Acumulado até hoje, descontando aportes'
+          : 'Acumulado até hoje, investimentos separados',
       'wallet',
     ],
     [
@@ -511,6 +517,16 @@ function renderSettings() {
   $('settingsAvatar').textContent = state.loggedAccount.displayName[0]?.toUpperCase() || 'F';
   $('themeSelect').value = state.themePreference;
   $('balanceModeSelect').value = state.balanceMode;
+  const opening = openingBalance();
+  $('settingsOpeningBalance').textContent = opening
+    ? money((opening.type === 'expense' ? -1 : 1) * opening.amount)
+    : 'Ainda não definido';
+  $('settingsOpeningBalanceDate').textContent = opening
+    ? 'Valor de partida em ' + formatDateBR(opening.date) + '.'
+    : 'Informe o valor que você já tinha antes dos lançamentos.';
+  $('btnEditOpeningBalance').textContent = opening
+    ? 'Alterar saldo inicial'
+    : 'Definir saldo inicial';
   $('syncDetail').textContent = Cloud.configured
     ? state.syncError
       ? 'Seus dados estão salvos neste aparelho. A conexão com a nuvem precisa ser retomada; tentaremos novamente quando houver conexão.'

@@ -1,4 +1,5 @@
 import { autoSnapshot } from '../data/backups.js';
+import { openingBalanceId } from './records.js';
 import { commitEntities, ensurePlannedBills, entities } from '../data/repository.js';
 import { validateFinancialGraph } from '../domain/finance.js';
 import { amountOK, isValidDate, sanitizeTransactionId } from '../domain/format.js';
@@ -27,7 +28,7 @@ async function importBackup(file) {
     !data ||
     typeof data !== 'object' ||
     (data.application && data.application !== 'FinancasFacil') ||
-    Number(data.schemaVersion) > 3
+    Number(data.schemaVersion) > 4
   ) {
     throw new Error('O formato ou a versão deste backup não é compatível.');
   }
@@ -54,7 +55,11 @@ async function importBackup(file) {
       if (!row || typeof row !== 'object' || !row.id) {
         throw new Error('Há um registro sem identificador válido. Nenhuma alteração foi feita.');
       }
-      if (entity === 'tx' && row.entryKind && !['normal', 'reversal'].includes(row.entryKind)) {
+      if (
+        entity === 'tx' &&
+        row.entryKind &&
+        !['normal', 'reversal', 'opening'].includes(row.entryKind)
+      ) {
         throw new Error('O backup contém um tipo de movimentação desconhecido.');
       }
       if (entity === 'bills') {
@@ -76,7 +81,9 @@ async function importBackup(file) {
         }
       }
       let id = sanitizeTransactionId(row.id);
-      if (owners.has(id) && owners.get(id) !== key) {
+      if (entity === 'tx' && row.entryKind === 'opening') {
+        id = await openingBalanceId(key);
+      } else if (owners.has(id) && owners.get(id) !== key) {
         id = 'import_' + (await sha256Hash(key + '_' + entity + '_' + id)).slice(0, 56);
       }
       if (ids.has(id) || maps[entity].has(String(row.id))) {

@@ -1,0 +1,38 @@
+<dialog id="openingBalanceDialog" class="dialog" aria-labelledby="openingBalanceTitle">
+  <form id="openingBalanceForm">
+    <div class="dialog-heading">
+      <h2 id="openingBalanceTitle">Defina seu saldo inicial</h2>
+      <button class="icon-button" type="button" data-close aria-label="Fechar">
+        <span data-icon="x"></span>
+      </button>
+    </div>
+    <p class="muted">Informe o valor que você já tem em conta para começar.</p>
+    <p id="openingBalanceHistoryHint" class="inline-alert" hidden>
+      Você já tem movimentações cadastradas. Informe o saldo que tinha antes delas, pois esses
+      lançamentos serão somados ao valor inicial.
+    </p>
+    <label for="openingBalanceAmount">Saldo inicial em reais</label>
+    <input
+      id="openingBalanceAmount"
+      name="openingBalance"
+      type="text"
+      inputmode="decimal"
+      autocomplete="off"
+      placeholder="0,00"
+      maxlength="22"
+      aria-describedby="openingBalanceHelp"
+      required
+    />
+    <p id="openingBalanceHelp" class="muted small">
+      Pode ser zero ou negativo. Você poderá alterar este valor em Dados e preferências.
+    </p>
+    <p id="openingBalanceDate" class="muted small"></p>
+    <p id="openingBalanceError" class="inline-alert danger" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button class="button quiet" type="button" data-close>Cancelar</button>
+      <button id="btnSaveOpeningBalance" class="button primary" type="submit">
+        Salvar saldo inicial
+      </button>
+    </div>
+  </form>
+</dialog>

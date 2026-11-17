@@ -317,7 +317,7 @@
   function backupPayload() {
     return {
       application: "FinancasFacil",
-      schemaVersion: 3,
+      schemaVersion: state.transactions.some((entry) => entry.entryKind === "opening") ? 4 : 3,
       exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
       account: account(),
       transactions: state.transactions,
@@ -374,12 +374,18 @@
     return (entry.entryKind === "reversal" ? -1 : 1) * entry.amount;
   }
   function normalizeEntry(item, raw) {
-    const entryKind = raw.entryKind === "reversal" ? "reversal" : "normal", relatedTransactionId = String(raw.relatedTransactionId || "").slice(0, 96);
+    const entryKind = ["reversal", "opening"].includes(raw.entryKind) ? raw.entryKind : "normal", relatedTransactionId = String(raw.relatedTransactionId || "").slice(0, 96);
+    if (entryKind === "opening" && (item.type === "investment" || relatedTransactionId)) {
+      throw new Error(
+        "O saldo inicial precisa ser um valor de conta sem vínculo com outro lançamento."
+      );
+    }
     if (entryKind === "reversal" && !relatedTransactionId) {
       throw new Error("O estorno precisa estar vinculado ao lançamento original.");
     }
     return {
       ...item,
+      ...entryKind === "opening" && { description: "Saldo inicial", category: "Saldo inicial" },
       entryKind,
       relatedTransactionId: entryKind === "reversal" ? relatedTransactionId : "",
       operationId: String(raw.operationId || "").slice(0, 96)
@@ -418,12 +424,15 @@
   function validateFinancialGraph(payload, options = {}) {
     const txs = new Map(payload.transactions.map((t) => [t.id, t])), rules = new Map(payload.rules.map((r) => [r.id, r]));
     const refunds = /* @__PURE__ */ new Map();
+    if (payload.transactions.filter((tx) => tx.entryKind === "opening").length > 1) {
+      throw new Error("Cada conta pode ter apenas um saldo inicial.");
+    }
     for (const tx of payload.transactions) {
       if (tx.entryKind !== "reversal") {
         continue;
       }
       const original = txs.get(tx.relatedTransactionId);
-      if (!original || original.entryKind === "reversal" || original.id === tx.id) {
+      if (!original || ["reversal", "opening"].includes(original.entryKind) || original.id === tx.id) {
         throw new Error(`Estorno “${tx.description}” sem lançamento original válido.`);
       }
       if (tx.type !== original.type) {
@@ -472,7 +481,7 @@
       }
       if (bill.status === "paid") {
         const tx = findBillTransaction(bill, payload.transactions);
-        if (!tx || tx.entryKind === "reversal") {
+        if (!tx || ["reversal", "opening"].includes(tx.entryKind)) {
           throw new Error(
             `A conta “${bill.description}” está paga, mas seu lançamento não existe no backup nem na conta atual.`
           );
@@ -510,7 +519,9 @@
   function sums(items) {
     const totals = items.reduce(
       (sum, t) => {
-        sum[t.type] += cents(entryAmount(t));
+        if (t.entryKind !== "opening") {
+          sum[t.type] += cents(entryAmount(t));
+        }
         return sum;
       },
       { income: 0, expense: 0, investment: 0 }
@@ -571,7 +582,7 @@
     const validTypes = ["expense", "income", "investment"];
     const type = validTypes.includes(rawItem.type) ? rawItem.type : "expense";
     const amountNum = Number(rawItem.amount);
-    if (!Number.isFinite(amountNum) || amountNum <= 0 || amountNum > 99999999999e-2) {
+    if (!Number.isFinite(amountNum) || amountNum < 0 || amountNum === 0 && rawItem.entryKind !== "opening" || amountNum > 99999999999e-2) {
       return null;
     }
     const roundedAmount = Math.round(amountNum * 100) / 100;
@@ -601,7 +612,7 @@
       throw new Error("Confira a data e o tipo do lançamento.");
     }
     const item = validateAndSanitizeTransaction(raw, key);
-    if (!item || !amountOK(item.amount)) {
+    if (!item || !amountOK(item.amount) && !(raw.entryKind === "opening" && item.amount === 0)) {
       throw new Error("Informe um valor entre R$ 0,01 e R$ 999.999.999,99.");
     }
     return normalizeEntry(item, raw);
@@ -716,7 +727,10 @@
   function monthTransactions(offset = 0) {
     const date = new Date(state.selectedYear, state.selectedMonth + offset, 1);
     const prefix = isoMonth(date.getFullYear(), date.getMonth());
-    return state.transactions.filter((t) => t.date.startsWith(prefix));
+    return state.transactions.filter((t) => t.entryKind !== "opening" && t.date.startsWith(prefix));
+  }
+  function openingBalance() {
+    return state.transactions.find((entry) => entry.entryKind === "opening") || null;
   }
   function realBills() {
     return state.bills.filter((b) => !isCancelled(b));
@@ -1107,6 +1121,9 @@
   function cleanRule(raw, key = account()) {
     return sanitizeRule(raw, key);
   }
+  async function openingBalanceId(key) {
+    return "opening_" + (await sha256Hash(key)).slice(0, 48);
+  }
 
   // src/js/application/finance.js
   function isBillPaid(bill) {
@@ -1116,9 +1133,9 @@
     return calculateBalance(totals, state.balanceMode);
   }
   function balanceSummary() {
-    const cutoff = today(), confirmed = state.transactions.filter((entry) => entry.date <= cutoff), totals = sums(confirmed);
+    const cutoff = today(), confirmed = state.transactions.filter((entry) => entry.date <= cutoff), totals = sums(confirmed), opening = openingBalance(), initial = opening && opening.date <= cutoff ? (opening.type === "expense" ? -1 : 1) * opening.amount : 0;
     return {
-      total: balanceValue(totals),
+      total: (cents(balanceValue(totals)) + cents(initial)) / 100,
       month: balanceValue(sums(monthTransactions())),
       investmentToDate: totals.investment,
       cutoff
@@ -1143,6 +1160,9 @@
     return !isCancelled(bill) && !isBillPaid(bill);
   }
   function reversalRecord(tx, amount, date, note = "") {
+    if (tx.entryKind === "opening") {
+      throw new Error("Altere o saldo inicial em Dados e preferências.");
+    }
     if (tx.entryKind === "reversal") {
       throw new Error("Edite ou exclua o estorno existente para corrigir seu valor.");
     }
@@ -2937,11 +2957,11 @@
     const rows = [...state.transactions].sort((a, b) => a.date.localeCompare(b.date)).map(
       (t) => [
         t.date,
-        { income: "Receita", expense: "Despesa", investment: "Investimento" }[t.type],
+        t.entryKind === "opening" ? "Saldo inicial" : { income: "Receita", expense: "Despesa", investment: "Investimento" }[t.type],
         t.category,
         t.description,
-        amountInput(entryAmount(t)),
-        t.entryKind === "reversal" ? "Estorno" : "Lançamento",
+        amountInput(t.entryKind === "opening" && t.type === "expense" ? -t.amount : entryAmount(t)),
+        t.entryKind === "opening" ? "Saldo inicial" : t.entryKind === "reversal" ? "Estorno" : "Lançamento",
         t.relatedTransactionId || ""
       ].map((v) => sanitizeCSVCell(v)).join(";")
     );
@@ -3255,12 +3275,14 @@
   function renderHome() {
     const month = monthTransactions(), sum = sums(month), balances = balanceSummary();
     const balance = balances.total;
+    const opening = openingBalance();
+    $("openingBalanceSetup").hidden = Boolean(opening) || Cloud.configured && !state.lastSync;
     const cards = [
       [
         "balance",
         "Saldo total hoje",
         balance,
-        state.balanceMode === "integrated" ? "Acumulado até hoje, descontando aportes" : "Acumulado até hoje, investimentos separados",
+        opening ? state.balanceMode === "integrated" ? "Saldo inicial + movimentações até hoje, descontando aportes" : "Saldo inicial + movimentações até hoje, investimentos separados" : state.balanceMode === "integrated" ? "Acumulado até hoje, descontando aportes" : "Acumulado até hoje, investimentos separados",
         "wallet"
       ],
       [
@@ -3543,6 +3565,10 @@
     $("settingsAvatar").textContent = state.loggedAccount.displayName[0]?.toUpperCase() || "F";
     $("themeSelect").value = state.themePreference;
     $("balanceModeSelect").value = state.balanceMode;
+    const opening = openingBalance();
+    $("settingsOpeningBalance").textContent = opening ? money((opening.type === "expense" ? -1 : 1) * opening.amount) : "Ainda não definido";
+    $("settingsOpeningBalanceDate").textContent = opening ? "Valor de partida em " + formatDateBR(opening.date) + "." : "Informe o valor que você já tinha antes dos lançamentos.";
+    $("btnEditOpeningBalance").textContent = opening ? "Alterar saldo inicial" : "Definir saldo inicial";
     $("syncDetail").textContent = Cloud.configured ? state.syncError ? "Seus dados estão salvos neste aparelho. A conexão com a nuvem precisa ser retomada; tentaremos novamente quando houver conexão." : `As alterações são guardadas primeiro neste aparelho e enviadas à nuvem. ${state.pendingCount ? state.pendingCount + " alteração(ões) aguardando envio." : "Nenhuma alteração na fila."}` : "Este projeto está funcionando no modo local. Para transferir seus dados para outro aparelho, exporte e restaure um backup. A sincronização automática depende da ativação da nuvem na instalação.";
     $("lastSyncLabel").textContent = state.lastSync ? "Última sincronização: " + new Date(state.lastSync).toLocaleString("pt-BR") : "Ainda não houve sincronização com a nuvem.";
     $("btnForceSyncNow").disabled = !Cloud.configured || state.syncBusy;
@@ -4474,6 +4500,65 @@
     });
   }
 
+  // src/js/application/opening-balance.js
+  function openOpeningBalance() {
+    if (Cloud.configured && !state.lastSync) {
+      throw new Error("Sincronize sua conta primeiro para conferir o saldo inicial salvo.");
+    }
+    const entry = openingBalance();
+    $("openingBalanceForm").reset();
+    $("openingBalanceTitle").textContent = entry ? "Altere seu saldo inicial" : "Defina seu saldo inicial";
+    $("openingBalanceAmount").value = entry ? amountInput((entry.type === "expense" ? -1 : 1) * entry.amount) : "";
+    $("openingBalanceDate").textContent = "Valor de partida em " + formatDateBR(entry?.date || today()) + ".";
+    $("openingBalanceHistoryHint").hidden = Boolean(entry) || !state.transactions.some((item) => item.entryKind !== "opening");
+    $("openingBalanceError").hidden = true;
+    $("openingBalanceDialog").showModal();
+  }
+  async function saveOpeningBalance(event) {
+    event.preventDefault();
+    const button = $("btnSaveOpeningBalance");
+    if (button.disabled) {
+      return;
+    }
+    const key = account(), generation = sessionLifecycle.generation;
+    button.disabled = true;
+    $("openingBalanceError").hidden = true;
+    try {
+      const raw = $("openingBalanceAmount").value.trim().replace(/R\$|\s/g, "");
+      const amount = parseAmount(raw.replace(/^[+-]/, "")) * (raw.startsWith("-") ? -1 : 1);
+      if (!Number.isFinite(amount) || amount !== 0 && !amountOK(Math.abs(amount))) {
+        throw new Error("Informe um saldo entre −R$ 999.999.999,99 e R$ 999.999.999,99.");
+      }
+      const previous = openingBalance();
+      const id = await openingBalanceId(key);
+      if (generation !== sessionLifecycle.generation) {
+        throw new Error("Sua sessão mudou. Entre novamente para continuar.");
+      }
+      await commitEntities([
+        [
+          "tx",
+          {
+            id,
+            type: amount < 0 ? "expense" : "income",
+            amount: Math.abs(amount),
+            date: previous?.date || today(),
+            entryKind: "opening",
+            description: "Saldo inicial",
+            category: "Saldo inicial",
+            createdAt: previous?.createdAt || Date.now()
+          }
+        ]
+      ]);
+      $("openingBalanceDialog").close();
+      toast("Saldo inicial salvo. Seu saldo total foi atualizado.");
+    } catch (error) {
+      $("openingBalanceError").textContent = error.message || "Não foi possível salvar o saldo inicial.";
+      $("openingBalanceError").hidden = false;
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   // src/js/application/restore.js
   async function importBackup(file) {
     if (!file) {
@@ -4488,7 +4573,7 @@
     } catch {
       throw new Error("Este arquivo não é um backup JSON válido.");
     }
-    if (!data || typeof data !== "object" || data.application && data.application !== "FinancasFacil" || Number(data.schemaVersion) > 3) {
+    if (!data || typeof data !== "object" || data.application && data.application !== "FinancasFacil" || Number(data.schemaVersion) > 4) {
       throw new Error("O formato ou a versão deste backup não é compatível.");
     }
     const raw = {
@@ -4506,7 +4591,7 @@
         if (!row || typeof row !== "object" || !row.id) {
           throw new Error("Há um registro sem identificador válido. Nenhuma alteração foi feita.");
         }
-        if (entity === "tx" && row.entryKind && !["normal", "reversal"].includes(row.entryKind)) {
+        if (entity === "tx" && row.entryKind && !["normal", "reversal", "opening"].includes(row.entryKind)) {
           throw new Error("O backup contém um tipo de movimentação desconhecido.");
         }
         if (entity === "bills") {
@@ -4521,7 +4606,9 @@
           }
         }
         let id = sanitizeTransactionId(row.id);
-        if (owners.has(id) && owners.get(id) !== key) {
+        if (entity === "tx" && row.entryKind === "opening") {
+          id = await openingBalanceId(key);
+        } else if (owners.has(id) && owners.get(id) !== key) {
           id = "import_" + (await sha256Hash(key + "_" + entity + "_" + id)).slice(0, 56);
         }
         if (ids.has(id) || maps[entity].has(String(row.id))) {
@@ -4591,6 +4678,8 @@
       renderSettings();
       $("profileName").value = state.loggedAccount.displayName;
       $("settingsDialog").showModal();
+    } else if (action === "opening-balance") {
+      openOpeningBalance();
     } else if (action === "edit-tx") {
       openEditor(id);
     } else if (action === "edit-bill") {
@@ -4635,6 +4724,7 @@
   function bindEvents() {
     bindAuthRecovery();
     bindProfileEvents();
+    $("openingBalanceForm").addEventListener("submit", saveOpeningBalance);
     $("tabLoginBtn").addEventListener("click", () => {
       switchAuthTab("login");
       $("authIdentifier").focus();

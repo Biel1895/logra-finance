@@ -8,7 +8,7 @@ import {
   txForBill,
 } from '../domain/finance.js';
 import { amountOK, today, uid } from '../domain/format.js';
-import { monthTransactions } from '../state/selectors.js';
+import { monthTransactions, openingBalance } from '../state/selectors.js';
 import { state } from '../state/store.js';
 
 function isBillPaid(bill) {
@@ -22,9 +22,14 @@ function balanceValue(totals) {
 function balanceSummary() {
   const cutoff = today(),
     confirmed = state.transactions.filter((entry) => entry.date <= cutoff),
-    totals = sums(confirmed);
+    totals = sums(confirmed),
+    opening = openingBalance(),
+    initial =
+      opening && opening.date <= cutoff
+        ? (opening.type === 'expense' ? -1 : 1) * opening.amount
+        : 0;
   return {
-    total: balanceValue(totals),
+    total: (cents(balanceValue(totals)) + cents(initial)) / 100,
     month: balanceValue(sums(monthTransactions())),
     investmentToDate: totals.investment,
     cutoff,
@@ -61,6 +66,9 @@ function isPending(bill) {
 }
 
 function reversalRecord(tx, amount, date, note = '') {
+  if (tx.entryKind === 'opening') {
+    throw new Error('Altere o saldo inicial em Dados e preferências.');
+  }
   if (tx.entryKind === 'reversal') {
     throw new Error('Edite ou exclua o estorno existente para corrigir seu valor.');
   }

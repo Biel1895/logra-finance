@@ -343,11 +343,17 @@ function exportCSV() {
     .map((t) =>
       [
         t.date,
-        { income: 'Receita', expense: 'Despesa', investment: 'Investimento' }[t.type],
+        t.entryKind === 'opening'
+          ? 'Saldo inicial'
+          : { income: 'Receita', expense: 'Despesa', investment: 'Investimento' }[t.type],
         t.category,
         t.description,
-        amountInput(entryAmount(t)),
-        t.entryKind === 'reversal' ? 'Estorno' : 'Lançamento',
+        amountInput(t.entryKind === 'opening' && t.type === 'expense' ? -t.amount : entryAmount(t)),
+        t.entryKind === 'opening'
+          ? 'Saldo inicial'
+          : t.entryKind === 'reversal'
+            ? 'Estorno'
+            : 'Lançamento',
         t.relatedTransactionId || '',
       ]
         .map((v) => sanitizeCSVCell(v))

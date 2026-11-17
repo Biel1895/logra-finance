@@ -2,14 +2,14 @@
  * Contratos dos registros persistidos. Valores monetários são reais positivos;
  * cálculos que distribuem ou totalizam dinheiro convertem para centavos inteiros.
  * @typedef {'income' | 'expense' | 'investment'} TransactionType
- * @typedef {'normal' | 'reversal'} EntryKind
+ * @typedef {'normal' | 'reversal' | 'opening'} EntryKind
  * @typedef {'pending' | 'paid' | 'cancelled'} BillStatus
  *
  * @typedef {Object} Transaction
  * @property {string} id Identificador estável, preservado ao editar.
  * @property {string} accountKey Identidade interna da conta proprietária.
  * @property {TransactionType} type
- * @property {number} amount Valor positivo em reais, com até duas casas decimais.
+ * @property {number} amount Valor positivo em reais, com até duas casas decimais. Saldo inicial aceita zero.
  * @property {string} date Data da movimentação efetiva: YYYY-MM-DD.
  * @property {string} description
  * @property {string} category
