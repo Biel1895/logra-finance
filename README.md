@@ -43,7 +43,7 @@ npm run verify
 | `npm run verify`       | Executar todas as verificações anteriores.                         |
 
 Para um fluxo específico: `npm run test:e2e -- balances`.
-Outras opções: `startup`, `core`, `reports-installments`, `management`, `opening-balance`, `cloud` e `pwa`.
+Outras opções: `startup`, `core`, `reports-installments`, `management`, `opening-balance`, `cloud`, `pwa` e `pwa-updates`.
 
 ## Onde alterar
 

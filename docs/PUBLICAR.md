@@ -30,7 +30,9 @@ Abra o endereço HTTPS publicado. Em navegadores que oferecem a instalação, us
 
 Abra o app online primeiro para preparar os arquivos offline. A interface pode abrir sem conexão. Entrar ou retomar uma sessão após fechar o app exige internet. Com uma sessão já aberta, você pode registrar lançamentos por texto ou formulário e sincronizá-los ao voltar a ficar online. O cache guarda os arquivos públicos da interface. Os lançamentos e a sessão usam seus armazenamentos próprios.
 
-O Vercel gera uma versão nova do cache quando os arquivos publicados mudam. Se ainda estiver vendo a versão antiga, feche as janelas do app e as abas do site antes de abrir novamente. Após publicar, confira a instalação e teste o retorno do Google e os links de senha também a partir do app instalado.
+O Vercel gera uma versão nova do cache quando os arquivos publicados mudam. O aplicativo verifica atualizações ao abrir, ao voltar à tela, ao recuperar conexão e a cada minuto em primeiro plano. A nova versão só é ativada depois que todos os arquivos da interface foram baixados. A página recarrega automaticamente quando não há formulário em edição, gravação, sincronização, áudio ou recuperação de senha em andamento. Em **Dados e preferências → Atualizações do aplicativo**, **Buscar atualização** permite conferir manualmente. Aplique atualizações com conexão.
+
+Na primeira publicação desse mecanismo, a versão antiga ainda precisa ser aberta com internet, encerrada e aberta novamente para receber o comportamento automático. No iPhone, o aplicativo fechado recebe a atualização quando voltar a ser usado. Após publicar, confira a instalação e teste o retorno do Google e os links de senha também a partir do app instalado.
 
 ## Ativar cadastro, e-mails e login social
 

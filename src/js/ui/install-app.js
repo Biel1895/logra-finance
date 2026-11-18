@@ -1,3 +1,5 @@
+import { initAppUpdates } from './app-updates.js';
+
 function initInstallApp() {
   // O manifesto é incluído pela publicação. O modo local continua independente.
   if (!document.querySelector('link[rel="manifest"]') || !('serviceWorker' in navigator)) {
@@ -51,9 +53,18 @@ function initInstallApp() {
   });
 
   update();
+  const controller = navigator.serviceWorker.controller;
   void navigator.serviceWorker
     .register('./service-worker.js', { updateViaCache: 'none' })
-    .catch((error) => console.warn('Não foi possível preparar o acesso offline:', error));
+    .catch(async (error) => {
+      console.warn('Não foi possível preparar o acesso offline:', error);
+      return navigator.serviceWorker.getRegistration().catch(() => null);
+    })
+    .then((registration) => {
+      if (registration) {
+        initAppUpdates(registration, controller);
+      }
+    });
 }
 
 export { initInstallApp };

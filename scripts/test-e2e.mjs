@@ -13,6 +13,7 @@ const suites = [
   'opening-balance',
   'cloud',
   'pwa',
+  'pwa-updates',
 ];
 const selected = process.argv.slice(2);
 const results = [];
